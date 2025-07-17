@@ -11,9 +11,9 @@ API_SECRET = '0uaiZXnDF5S1k17kz3DPRla4XSisTVYHZ7qvuQ9Bb4WVwsDhNdbv2Pad6xzXAuc0'
 
 client = Client(API_KEY, API_SECRET)
 
-SYMBOL = 'XRPUSDT'
+SYMBOL = 'XRP/EUR'
 TIMEFRAME = '4h'
-USDT_PORTION = 0.8
+EUR_PORTION = 0.8
 
 def get_klines():
     klines = client.get_klines(symbol=SYMBOL, interval=TIMEFRAME, limit=100)
@@ -32,8 +32,8 @@ def get_indicators(df):
     return df
 
 def place_trade(entry_price, atr):
-    usdt_balance = float(client.get_asset_balance('USDT')['free'])
-    qty = (usdt_balance * USDT_PORTION) / entry_price
+    usdt_balance = float(client.get_asset_balance('EUR')['free'])
+    qty = (usdt_balance * EUR_PORTION) / entry_price
     stop = round(entry_price - 2.5 * atr, 4)
     take = round(entry_price + 3.5 * atr, 4)
 
