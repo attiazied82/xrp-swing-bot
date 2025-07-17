@@ -33,7 +33,7 @@ def get_indicators(df):
 
 def place_trade(entry_price, atr):
     usdt_balance = float(client.get_asset_balance('EUR')['free'])
-    qty = (usdt_balance * EUR_PORTION) / entry_price
+    qty = (eur_balance * EUR_PORTION) / entry_price
     stop = round(entry_price - 2.5 * atr, 4)
     take = round(entry_price + 3.5 * atr, 4)
 
