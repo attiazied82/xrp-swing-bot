@@ -12,9 +12,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-API_KEY = os.getenv("API_KEY")
+API_KEY = os.getenv("5huWOQsBrwBCFPTL6YBPxzpV0pCZHx5nd9qDm9MB5CHngY2OCglQmlDlsqBBE0VV")
 
-API_SECRET = os.getenv("API_SECRET")
+API_SECRET = os.getenv("0uaiZXnDF5S1k17kz3DPRla4XSisTVYHZ7qvuQ9Bb4WVwsDhNdbv2Pad6xzXAuc0")
 
 client = Client(API_KEY, API_SECRET)
 
