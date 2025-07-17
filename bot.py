@@ -57,36 +57,27 @@ def get_indicators(df):
     df['atr'] = AverageTrueRange(df['high'], df['low'], df['close'], 14).average_true_range()
 
     return df
-
 def place_trade(entry_price, atr):
-
-    eur_balance = float(client.get_asset_balance('EUR')['free'])
-
-    qty = (eur_balance * EUR_PORTION) / entry_price
-
-    qty = round(qty, 1)
-
-    if qty < 10:
-
-        print(f"⚠️ XRP-Menge ({qty}) unter Mindestmenge von 10. Abbruch.")
-
-        return
-
-    stop = round(entry_price - 2.5 * atr, 4)
-
-    take = round(entry_price + 3.5 * atr, 4)
-
-    order = client.order_market_buy(
-
-        symbol=SYMBOL,
-
-        quantity=qty
-
-    )
-
-    print("✅ Buy order executed:", order)
-
-    print(f"📉 SL bei {stop}, 📈 TP bei {take}")
+   eur_balance = float(client.get_asset_balance(asset='EUR')['free'])
+   amount_to_spend = eur_balance * EUR_PORTION
+   raw_qty = Decimal(str(amount_to_spend / entry_price))
+   # XRP erlaubt 1 Dezimalstelle → Schrittgröße 0.1
+   qty = raw_qty.quantize(Decimal('0.1'), rounding=ROUND_DOWN)
+   if qty < Decimal('10.0'):
+       print(f"⚠️ XRP-Menge ({qty}) unter Mindestgröße (10.0). Kein Trade.")
+       return
+   stop = round(entry_price - 2.5 * atr, 4)
+   take = round(entry_price + 3.5 * atr, 4)
+   print(f"💰 EUR: {eur_balance:.2f}, Preis: {entry_price:.4f}, Kaufmenge: {qty}")
+   print(f"📉 SL: {stop}, 📈 TP: {take}")
+   try:
+       order = client.order_market_buy(
+           symbol=SYMBOL,
+           quantity=str(qty)  # Binance erwartet string!
+       )
+       print("✅ Kauf erfolgreich:", order)
+   except Exception as e:
+       print("❌ Binance API-Fehler:", e)
 
 def main():
 
