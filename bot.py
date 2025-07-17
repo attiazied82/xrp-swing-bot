@@ -1,5 +1,5 @@
 from entry_logic import fetch_ohlcv, check_entry_signal
-
+from decimal import Decimal, ROUND_DOWN
 import time
 
 import pandas as pd
