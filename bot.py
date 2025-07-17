@@ -3,8 +3,8 @@ from binance.client import Client
 from dotenv import load_dotenv
 from decimal import Decimal, ROUND_DOWN
 load_dotenv()
-API_KEY = os.getenv("API_KEY")
-API_SECRET = os.getenv("API_SECRET")
+API_KEY = os.getenv("5huWOQsBrwBCFPTL6YBPxzpV0pCZHx5nd9qDm9MB5CHngY2OCglQmlDlsqBBE0VV")
+API_SECRET = os.getenv("0uaiZXnDF5S1k17kz3DPRla4XSisTVYHZ7qvuQ9Bb4WVwsDhNdbv2Pad6xzXAuc0")
 client = Client(API_KEY, API_SECRET)
 SYMBOL = "XRPEUR"
 EUR_PORTION = Decimal("0.9")
