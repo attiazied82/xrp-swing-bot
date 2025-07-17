@@ -1,18 +1,12 @@
-from entry_logic import fetch_ohlcv, check_entry_signal
-from decimal import Decimal, ROUND_DOWN
+import os
+
 import time
-
-import pandas as pd
-
-from ta.trend import EMAIndicator
-
-from ta.momentum import RSIIndicator
-
-from ta.volatility import AverageTrueRange
 
 from binance.client import Client
 
-import os
+from binance.enums import *
+
+from decimal import Decimal, ROUND_DOWN
 
 from dotenv import load_dotenv
 
@@ -24,78 +18,113 @@ API_SECRET = os.getenv("API_SECRET")
 
 client = Client(API_KEY, API_SECRET)
 
-SYMBOL = 'XRPEUR'  # Binance REST-API verwendet kein Slash (/)
+SYMBOL = "XRPEUR"
 
-TIMEFRAME = '4h'
+EUR_PORTION = 0.9   # 90 % des EUR-Guthabens verwenden
 
-EUR_PORTION = 0.8
+MIN_XRP = Decimal('10.0')  # Mindestmenge laut Binance
 
-def get_klines():
+def get_step_size(symbol):
 
-    klines = client.get_klines(symbol=SYMBOL, interval=TIMEFRAME, limit=100)
+    info = client.get_symbol_info(symbol)
 
-    df = pd.DataFrame(klines, columns=[
+    for f in info['filters']:
 
-        'open_time', 'open', 'high', 'low', 'close', 'volume',
+        if f['filterType'] == 'LOT_SIZE':
 
-        'close_time', 'qav', 'num_trades', 'tbb', 'tbq', 'ignore'
+            return Decimal(f['stepSize'])
 
-    ])
+    raise Exception("Step size konnte nicht geladen werden")
 
-    df = df.astype({'open':'float','high':'float','low':'float','close':'float'})
+def get_price(symbol):
 
-    return df
+    ticker = client.get_symbol_ticker(symbol=symbol)
 
-def get_indicators(df):
+    return Decimal(ticker['price'])
 
-    df['ema20'] = EMAIndicator(df['close'], 20).ema_indicator()
+def get_balance(asset='EUR'):
 
-    df['ema50'] = EMAIndicator(df['close'], 50).ema_indicator()
+    balance = client.get_asset_balance(asset=asset)
 
-    df['rsi'] = RSIIndicator(df['close'], 14).rsi()
+    return Decimal(balance['free'])
 
-    df['atr'] = AverageTrueRange(df['high'], df['low'], df['close'], 14).average_true_range()
+def round_step_size(quantity, step_size):
 
-    return df
-def place_trade(entry_price, atr):
-   eur_balance = float(client.get_asset_balance(asset='EUR')['free'])
-   amount_to_spend = eur_balance * EUR_PORTION
-   raw_qty = Decimal(str(amount_to_spend / entry_price))
-   # XRP erlaubt 1 Dezimalstelle → Schrittgröße 0.1
-   qty = raw_qty.quantize(Decimal('0.1'), rounding=ROUND_DOWN)
-   if qty < Decimal('10.0'):
-       print(f"⚠️ XRP-Menge ({qty}) unter Mindestgröße (10.0). Kein Trade.")
-       return
-   stop = round(entry_price - 2.5 * atr, 4)
-   take = round(entry_price + 3.5 * atr, 4)
-   print(f"💰 EUR: {eur_balance:.2f}, Preis: {entry_price:.4f}, Kaufmenge: {qty}")
-   print(f"📉 SL: {stop}, 📈 TP: {take}")
-   try:
-       order = client.order_market_buy(
-           symbol=SYMBOL,
-           quantity=str(qty)  # Binance erwartet string!
-       )
-       print("✅ Kauf erfolgreich:", order)
-   except Exception as e:
-       print("❌ Binance API-Fehler:", e)
+    return (quantity // step_size) * step_size
 
-def main():
+def place_order_with_tp_sl(symbol, price, atr):
 
-    df = get_klines()
+    eur_balance = get_balance('EUR')
 
-    df = get_indicators(df)
+    amount_to_spend = eur_balance * Decimal(str(EUR_PORTION))
 
-    latest = df.iloc[-1]
+    step_size = get_step_size(symbol)
 
-    if latest['ema20'] > latest['ema50'] and latest['rsi'] > 50:
+    xrp_price = get_price(symbol)
 
-        print("📈 Entry signal detected.")
+    # XRP-Menge berechnen
 
-        place_trade(latest['close'], latest['atr'])
+    raw_qty = amount_to_spend / xrp_price
 
-    else:
+    qty = round_step_size(raw_qty, step_size)
 
-        print("❌ No entry signal.")
+    if qty < MIN_XRP:
+
+        print(f"❌ Kaufmenge ({qty}) unter Mindestgröße ({MIN_XRP}). Kein Kauf.")
+
+        return
+
+    print(f"📈 Marktpreis: {xrp_price:.4f}, EUR: {eur_balance}, XRP Menge: {qty}")
+
+    # SL / TP berechnen
+
+    stop_price = (xrp_price - atr * 2).quantize(Decimal('0.0001'), rounding=ROUND_DOWN)
+
+    tp_price = (xrp_price + atr * 3).quantize(Decimal('0.0001'), rounding=ROUND_DOWN)
+
+    print(f"🛡️ SL bei {stop_price}, 🎯 TP bei {tp_price}")
+
+    try:
+
+        # Markt-Kauf
+
+        buy = client.order_market_buy(
+
+            symbol=symbol,
+
+            quantity=float(qty)
+
+        )
+
+        print("✅ Kauf erfolgreich:", buy)
+
+        # OCO-Order für TP & SL
+
+        oco = client.create_oco_order(
+
+            symbol=symbol,
+
+            side=SIDE_SELL,
+
+            quantity=float(qty),
+
+            price=str(tp_price),                     # Take Profit
+
+            stopPrice=str(stop_price),              # Stop Trigger
+
+            stopLimitPrice=str(stop_price - Decimal('0.0010')),  # Stop-Limit
+
+            stopLimitTimeInForce=TIME_IN_FORCE_GTC
+
+        )
+
+        print("✅ TP/SL OCO-Order gesetzt:", oco)
+
+    except Exception as e:
+
+        print("❌ Binance-Fehler:", e)
+
+# Beispielhafter Durchlauf
 
 if __name__ == "__main__":
 
@@ -103,13 +132,19 @@ if __name__ == "__main__":
 
         try:
 
-            main()
+            current_price = get_price(SYMBOL)
+
+            atr = Decimal('0.015')  # Beispielwert oder von Strategie ableiten
+
+            print("\n📊 Starte neuen Entry-Versuch...")
+
+            place_order_with_tp_sl(SYMBOL, current_price, atr)
 
         except Exception as e:
 
-            print("❌ Fehler:", e)
+            print("❌ Laufzeitfehler:", e)
 
-        print("⏳ Warte 60 Minuten...\n")
+        print("⏳ Warte 60 Minuten...")
 
         time.sleep(3600)
  
