@@ -1,4 +1,4 @@
-
+from entry_logic import fetch_ohlcv, check_entry_signa
 import time
 import pandas as pd
 from ta.trend import EMAIndicator
