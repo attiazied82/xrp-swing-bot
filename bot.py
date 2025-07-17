@@ -34,8 +34,8 @@ def get_indicators(df):
 def place_trade(entry_price, atr):
     usdt_balance = float(client.get_asset_balance('USDT')['free'])
     qty = (usdt_balance * USDT_PORTION) / entry_price
-    stop = round(entry_price - 1.5 * atr, 4)
-    take = round(entry_price + 2.5 * atr, 4)
+    stop = round(entry_price - 2.5 * atr, 4)
+    take = round(entry_price + 3.5 * atr, 4)
 
     order = client.order_market_buy(symbol=SYMBOL, quantity=round(qty, 1))
     print("Buy order executed:", order)
